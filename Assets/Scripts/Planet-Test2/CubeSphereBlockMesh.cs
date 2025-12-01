@@ -42,6 +42,22 @@ public class CubeSphereBlockMesh : MonoBehaviour
     [Tooltip("Offset from radius where sea level sits. Sea radius = radius + seaLevelOffset.")]
     public float seaLevelOffset = 0f;   // 0 = sea at radius; negative = lower sea; positive = higher
 
+    // Per-cell data (for temperature / climate)
+    [Header("Generated Per-Cell Data")]
+    [Tooltip("Unit direction from planet center through cell center.")]
+    [HideInInspector] public Vector3[] cellCenterDirection;
+
+    [Tooltip("Latitude factor per cell (dir.y, i.e. sin(latitude)).")]
+    [HideInInspector] public float[] cellLatitude;
+
+    [Tooltip("Elevation relative to base radius (cellBaseRadius - radius).")]
+    [HideInInspector] public float[] cellElevation;
+
+    [Tooltip("True if this cell is land; false if water.")]
+    [HideInInspector] public bool[] cellIsLand;
+
+    public int TotalCells => cellCenterDirection != null ? cellCenterDirection.Length : 0;
+
     // Directions for the 6 cube faces (like a dice)
     private static readonly Vector3[] faceDirections =
     {
@@ -65,6 +81,12 @@ public class CubeSphereBlockMesh : MonoBehaviour
 
         int steps = Mathf.Max(1, cellsPerFace);
         int totalCells = 6 * steps * steps;
+
+        // Allocate / reallocate per-cell data
+        cellCenterDirection = new Vector3[totalCells];
+        cellLatitude = new float[totalCells];
+        cellElevation = new float[totalCells];
+        cellIsLand = new bool[totalCells];
 
         // Each cell: 8 vertices (4 bottom, 4 top)
         int vertsPerCell = 8;
@@ -93,6 +115,9 @@ public class CubeSphereBlockMesh : MonoBehaviour
             {
                 for (int x = 0; x < steps; x++)
                 {
+                    // Compute linear cell index (matches generation order & picker decoding)
+                    int cellIndex = face * (steps * steps) + y * steps + x;
+
                     // Normalized 0–1 cell coords in UV
                     float u0 = (float)x / steps;
                     float v0 = (float)y / steps;
@@ -115,6 +140,10 @@ public class CubeSphereBlockMesh : MonoBehaviour
 
                     Vector3 dCenter = (d00 + d10 + d11 + d01) * 0.25f;
                     dCenter.Normalize();
+
+                    // Store center direction & latitude factor for later (temperature, etc.)
+                    cellCenterDirection[cellIndex] = dCenter;
+                    cellLatitude[cellIndex] = dCenter.y; // sin(latitude), assuming world Y is spin axis
 
                     // Continental mask: 0..1
                     float continentN = SampleSphereNoise(dCenter, continentFrequency, continentSeed);
@@ -148,6 +177,12 @@ public class CubeSphereBlockMesh : MonoBehaviour
                         float depth = Mathf.Abs(terrainOffset);
                         cellBaseRadius = seaRadius - depth - seaLevelOffset;
                     }
+
+                    // Store land/water classification
+                    cellIsLand[cellIndex] = isLand;
+
+                    // Elevation relative to base radius (can be negative for deep oceans)
+                    cellElevation[cellIndex] = cellBaseRadius - radius;
 
                     float cellTopRadius = cellBaseRadius + blockHeight;
 

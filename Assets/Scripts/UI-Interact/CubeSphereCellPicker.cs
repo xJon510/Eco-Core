@@ -8,15 +8,21 @@ public class CubeSphereCellPicker : MonoBehaviour
     [SerializeField] private CubeSphereBlockMesh planet;
     [SerializeField] private MeshCollider planetCollider;
 
+    [Header("Managers")]
+    [SerializeField] private TemperatureManager temperatureManager;
+
     [Header("UI")]
     [SerializeField] private TextMeshProUGUI cellLocationText;
     [SerializeField] private TextMeshProUGUI cellFaceText;
+    [SerializeField] private TextMeshProUGUI cellLatText;
+    [SerializeField] private TextMeshProUGUI cellTempText;
 
     [Header("Raycast")]
     [SerializeField] private float maxDistance = 10000f;
     [SerializeField] private LayerMask raycastMask = ~0;
 
     private Camera cam;
+    private int lastCellIndex = -1;
 
     private void Awake()
     {
@@ -31,6 +37,11 @@ public class CubeSphereCellPicker : MonoBehaviour
     {
         if (Input.GetMouseButtonDown(0))
             HandleClick(Input.mousePosition);
+
+        if (lastCellIndex >= 0)
+        {
+            UpdateCellInfo(lastCellIndex);
+        }
     }
 
     private void HandleClick(Vector3 screenPos)
@@ -47,7 +58,7 @@ public class CubeSphereCellPicker : MonoBehaviour
             Mesh mesh = planetCollider.sharedMesh;
             if (!mesh) return;
 
-            // --- FIX: Use main triangles only (submesh = 0 always) ---
+            // Use main triangles only (submesh 0 indices)
             int[] tris = mesh.triangles;
 
             int triStart = hit.triangleIndex * 3;
@@ -55,25 +66,60 @@ public class CubeSphereCellPicker : MonoBehaviour
             int v1 = tris[triStart + 1];
             int v2 = tris[triStart + 2];
 
-            // Each cell uses 8 vertices in order -> we can decode cell directly
+            // Each cell uses 8 vertices in order -> decode cell index
             int cellVertexIndex = Mathf.Min(v0, Mathf.Min(v1, v2));
             int cellIndex = cellVertexIndex / 8;
 
-            // Decode back into face + grid coords
-            int steps = Mathf.Max(1, planet.cellsPerFace);
-            int cellsPerFace = steps * steps;
+            // Store for continuous updates
+            lastCellIndex = cellIndex;
 
-            int faceIndex = cellIndex / cellsPerFace;
-            int indexInFace = cellIndex % cellsPerFace;
+            // Immediately refresh UI once on click
+            UpdateCellInfo(cellIndex);
+        }
+    }
 
-            int y = indexInFace / steps;
-            int x = indexInFace % steps;
+    /// <summary>
+    /// Updates the debug UI for a given cell index (location, face, latitude, temperature).
+    /// Called every frame for the last clicked cell.
+    /// </summary>
+    private void UpdateCellInfo(int cellIndex)
+    {
+        if (!planet)
+            return;
 
-            if (cellLocationText)
-                cellLocationText.text = $"Cell: ({x}, {y})";
+        int totalCells = planet.TotalCells;
+        if (cellIndex < 0 || cellIndex >= totalCells)
+            return;
 
-            if (cellFaceText)
-                cellFaceText.text = $"Face: {faceIndex + 1}";
+        int steps = Mathf.Max(1, planet.cellsPerFace);
+        int cellsPerFace = steps * steps;
+
+        int faceIndex = cellIndex / cellsPerFace;
+        int indexInFace = cellIndex % cellsPerFace;
+
+        int y = indexInFace / steps;
+        int x = indexInFace % steps;
+
+        if (cellLocationText)
+            cellLocationText.text = $"Cell: ({x}, {y})";
+
+        if (cellFaceText)
+            cellFaceText.text = $"Face: {faceIndex + 1}";
+
+        if (cellLatText && planet.cellLatitude != null && cellIndex < planet.cellLatitude.Length)
+        {
+            // dir.y is sin(latitude); convert to degrees.
+            float sinLat = Mathf.Clamp(planet.cellLatitude[cellIndex], -1f, 1f);
+            float latDeg = Mathf.Asin(sinLat) * Mathf.Rad2Deg;
+            cellLatText.text = $"Lat: {latDeg:F1}°";
+        }
+
+        if (cellTempText && temperatureManager && temperatureManager.IsInitialized)
+        {
+            float tempC = temperatureManager.GetCellTemperature(cellIndex);
+            float tempF = (tempC * 9f / 5f) + 32f;
+
+            cellTempText.text = $"Temp: {tempC:F1} °C / {tempF:F1} °F";
         }
     }
 }

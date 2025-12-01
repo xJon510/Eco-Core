@@ -106,11 +106,11 @@ public class SunRotate : MonoBehaviour
             dailyPivot.localRotation = Quaternion.Euler(0f, dailyAngle, 0f);
         }
 
-        // Yearly: tilt the sun's orbital plane by declination around X.
+        // Yearly: tilt the sun's orbital plane by declination around Z.
         // Again, change axis to taste depending on how your world is oriented.
         if (yearlyPivot != null)
         {
-            yearlyPivot.localRotation = Quaternion.Euler(declination, 0f, 0f);
+            yearlyPivot.localRotation = Quaternion.Euler(0f, 0f, declination);
         }
     }
 
