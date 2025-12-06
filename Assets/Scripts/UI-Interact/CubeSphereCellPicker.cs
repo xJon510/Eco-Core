@@ -16,6 +16,7 @@ public class CubeSphereCellPicker : MonoBehaviour
     [SerializeField] private TextMeshProUGUI cellFaceText;
     [SerializeField] private TextMeshProUGUI cellLatText;
     [SerializeField] private TextMeshProUGUI cellTempText;
+    [SerializeField] private TextMeshProUGUI cellHumidityText;
 
     [Header("Raycast")]
     [SerializeField] private float maxDistance = 10000f;
@@ -120,6 +121,12 @@ public class CubeSphereCellPicker : MonoBehaviour
             float tempF = (tempC * 9f / 5f) + 32f;
 
             cellTempText.text = $"Temp: {tempC:F1} °C / {tempF:F1} °F";
+        }
+
+        if (cellHumidityText && planet.cellHumidity != null && cellIndex < planet.cellHumidity.Length)
+        {
+            float hum = planet.cellHumidity[cellIndex]; // already 0–100
+            cellHumidityText.text = $"Humidity: {hum:F1} %";
         }
     }
 }
